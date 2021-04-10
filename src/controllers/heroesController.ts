@@ -8,6 +8,22 @@ class HeroesController {
 
     heroesRepository = new HeroesRepository();
 
+    async fillCache() 
+    {
+        const data = await axiosInstance.get(endpoints.searchHeroes);
+
+        await this.heroesRepository.setHeroesJson(data.data);
+    }
+
+    getResponseCode(length: number, errorCode: number)
+    {
+        if(length < 1)
+        {
+            return errorCode;
+        }
+        return responseCodes.HTTP_OK;
+    }
+
     async search (request: Request, response: Response)
     {
         const { q } = request.query;
@@ -21,27 +37,14 @@ class HeroesController {
         try{
             if(this.heroesRepository.cacheIsEmpty())
             {
-                const data = await axiosInstance.get(endpoints.searchHeroes);
-
-                this.heroesRepository.setHeroesJson(data.data);
-
-                const heroes = this.heroesRepository.filterHero(String(q));
-                let responseCode = responseCodes.HTTP_OK;
-                if(heroes.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NO_CONTENT;
-                }
-                return response.status(responseCode).send(heroes);
+                await this.fillCache();
             }
-            else {
-                const heroes = this.heroesRepository.filterHero(String(q));
-                let responseCode = responseCodes.HTTP_OK;
-                if(heroes.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NO_CONTENT;
-                }
-                return response.status(responseCode).send(heroes);
-            }
+
+            const heroes = await this.heroesRepository.filterHero(String(q));
+
+            const status = this.getResponseCode(heroes.length, responseCodes.HTTP_NO_CONTENT);
+
+            return response.status(status).send(heroes);
         }
         catch(error)
         {
@@ -59,30 +62,13 @@ class HeroesController {
         try{
             if(this.heroesRepository.cacheIsEmpty())
             {
-                const data = await axiosInstance.get(endpoints.searchHeroes);
-                this.heroesRepository.setHeroesJson(data.data);
-
-                const hero = this.heroesRepository.findHero(slug);
-
-                let responseCode = responseCodes.HTTP_OK;
-
-                if(hero.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NOT_FOUND;
-                }
-                return response.status(responseCode).send(hero);
+                await this.fillCache();
             }
-            else {
-                const hero = this.heroesRepository.findHero(slug);
+                const hero = await this.heroesRepository.findHero(slug);
 
-                let responseCode = responseCodes.HTTP_OK;
+                const status = this.getResponseCode(hero.length, responseCodes.HTTP_NOT_FOUND);
 
-                if(hero.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NOT_FOUND;
-                }
-                return response.status(responseCode).send(hero);
-            }
+                return response.status(status).send(hero);
         }
         catch(error)
         {
