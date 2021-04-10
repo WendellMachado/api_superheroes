@@ -2,28 +2,28 @@ import { Request, Response } from "express";
 import responseCodes from './responseCode';
 import endpoints from '../externalApi/endpoints';
 import axiosInstance from '../externalApi/axiosConfig';
-import {cacheIsEmpty, setCacheKey, getCacheKey} from '../cache/cache';
-
-function filterHero (searchTerm: string) {
-    const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero: any) => {
-        return Object.values(hero).toString().toLowerCase().includes(searchTerm.toLowerCase()); 
-    });
-
-    return filteredResponse;
-}
-
-function findHero (slug: string)
-{
-    const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero: any) => {
-        return hero.slug.toString().toLowerCase() === slug.toLowerCase(); 
-    });
-
-    return filteredResponse;
-}
+import HeroesRepository from '../cache/repositories/heroesRepository';
 
 class HeroesController {
+
+    heroesRepository = new HeroesRepository();
+
+    async fillCache() 
+    {
+        const data = await axiosInstance.get(endpoints.searchHeroes);
+
+        await this.heroesRepository.setHeroesJson(data.data);
+    }
+
+    getResponseCode(length: number, errorCode: number)
+    {
+        if(length < 1)
+        {
+            return errorCode;
+        }
+        return responseCodes.HTTP_OK;
+    }
+
     async search (request: Request, response: Response)
     {
         const { q } = request.query;
@@ -35,28 +35,16 @@ class HeroesController {
         }
 
         try{
-            if(cacheIsEmpty())
+            if(this.heroesRepository.cacheIsEmpty())
             {
-                const data = await axiosInstance.get(endpoints.searchHeroes);
-                setCacheKey('heroes', data.data, 86400);
+                await this.fillCache();
+            }
 
-                const heroes = filterHero(String(q));
-                let responseCode = responseCodes.HTTP_OK;
-                if(heroes.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NO_CONTENT;
-                }
-                return response.status(responseCode).send(heroes);
-            }
-            else {
-                const heroes = filterHero(String(q));
-                let responseCode = responseCodes.HTTP_OK;
-                if(heroes.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NO_CONTENT;
-                }
-                return response.status(responseCode).send(heroes);
-            }
+            const heroes = await this.heroesRepository.filterHero(String(q));
+
+            const status = this.getResponseCode(heroes.length, responseCodes.HTTP_NO_CONTENT);
+
+            return response.status(status).send(heroes);
         }
         catch(error)
         {
@@ -72,32 +60,15 @@ class HeroesController {
         const { slug } = request.params;
 
         try{
-            if(cacheIsEmpty())
+            if(this.heroesRepository.cacheIsEmpty())
             {
-                const data = await axiosInstance.get(endpoints.searchHeroes);
-                setCacheKey('heroes', data.data, 86400);
-
-                const hero = findHero(slug);
-
-                let responseCode = responseCodes.HTTP_OK;
-
-                if(hero.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NOT_FOUND;
-                }
-                return response.status(responseCode).send(hero);
+                await this.fillCache();
             }
-            else {
-                const hero = findHero(slug);
+                const hero = await this.heroesRepository.findHero(slug);
 
-                let responseCode = responseCodes.HTTP_OK;
+                const status = this.getResponseCode(hero.length, responseCodes.HTTP_NOT_FOUND);
 
-                if(hero.length < 1)
-                {
-                    responseCode = responseCodes.HTTP_NOT_FOUND;
-                }
-                return response.status(responseCode).send(hero);
-            }
+                return response.status(status).send(hero);
         }
         catch(error)
         {
