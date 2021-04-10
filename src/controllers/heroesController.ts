@@ -2,28 +2,12 @@ import { Request, Response } from "express";
 import responseCodes from './responseCode';
 import endpoints from '../externalApi/endpoints';
 import axiosInstance from '../externalApi/axiosConfig';
-import {cacheIsEmpty, setCacheKey, getCacheKey} from '../cache/cache';
-
-function filterHero (searchTerm: string) {
-    const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero: any) => {
-        return Object.values(hero).toString().toLowerCase().includes(searchTerm.toLowerCase()); 
-    });
-
-    return filteredResponse;
-}
-
-function findHero (slug: string)
-{
-    const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero: any) => {
-        return hero.slug.toString().toLowerCase() === slug.toLowerCase(); 
-    });
-
-    return filteredResponse;
-}
+import HeroesRepository from '../cache/repositories/heroesRepository';
 
 class HeroesController {
+
+    heroesRepository = new HeroesRepository();
+
     async search (request: Request, response: Response)
     {
         const { q } = request.query;
@@ -35,12 +19,13 @@ class HeroesController {
         }
 
         try{
-            if(cacheIsEmpty())
+            if(this.heroesRepository.cacheIsEmpty())
             {
                 const data = await axiosInstance.get(endpoints.searchHeroes);
-                setCacheKey('heroes', data.data, 86400);
 
-                const heroes = filterHero(String(q));
+                this.heroesRepository.setHeroesJson(data.data);
+
+                const heroes = this.heroesRepository.filterHero(String(q));
                 let responseCode = responseCodes.HTTP_OK;
                 if(heroes.length < 1)
                 {
@@ -49,7 +34,7 @@ class HeroesController {
                 return response.status(responseCode).send(heroes);
             }
             else {
-                const heroes = filterHero(String(q));
+                const heroes = this.heroesRepository.filterHero(String(q));
                 let responseCode = responseCodes.HTTP_OK;
                 if(heroes.length < 1)
                 {
@@ -72,12 +57,12 @@ class HeroesController {
         const { slug } = request.params;
 
         try{
-            if(cacheIsEmpty())
+            if(this.heroesRepository.cacheIsEmpty())
             {
                 const data = await axiosInstance.get(endpoints.searchHeroes);
-                setCacheKey('heroes', data.data, 86400);
+                this.heroesRepository.setHeroesJson(data.data);
 
-                const hero = findHero(slug);
+                const hero = this.heroesRepository.findHero(slug);
 
                 let responseCode = responseCodes.HTTP_OK;
 
@@ -88,7 +73,7 @@ class HeroesController {
                 return response.status(responseCode).send(hero);
             }
             else {
-                const hero = findHero(slug);
+                const hero = this.heroesRepository.findHero(slug);
 
                 let responseCode = responseCodes.HTTP_OK;
 
