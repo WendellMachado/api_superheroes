@@ -6,7 +6,7 @@ import {cacheIsEmpty, setCacheKey, getCacheKey} from '../cache/cache';
 
 function filterHero (searchTerm: string) {
     const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero) => {
+    const filteredResponse = responseData.filter((hero: any) => {
         return Object.values(hero).toString().toLowerCase().includes(searchTerm.toLowerCase()); 
     });
 
@@ -16,7 +16,7 @@ function filterHero (searchTerm: string) {
 function findHero (slug: string)
 {
     const responseData = getCacheKey('heroes');
-    const filteredResponse = responseData.filter((hero) => {
+    const filteredResponse = responseData.filter((hero: any) => {
         return hero.slug.toString().toLowerCase() === slug.toLowerCase(); 
     });
 
